@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Tiempo Personal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for selected list item */
+        .task-item.selected {
+            background-color: #dbeafe; /* light blue */
+            border-color: #3b82f6; /* blue */
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-2xl shadow-lg p-6 md:p-8">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-slate-900">Gestor de Tiempo Personal</h1>
+            <p class="text-slate-500 mt-1">Organiza tu día y enfócate en lo que importa.</p>
+        </header>
+
+        <!-- Formulario para agregar tareas -->
+        <div class="bg-slate-50 p-4 rounded-lg mb-6 border border-slate-200">
+            <h2 class="text-lg font-semibold mb-3 text-slate-700">Añadir Nueva Tarea</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div class="col-span-1 md:col-span-2">
+                    <label for="titulo" class="block text-sm font-medium text-slate-600 mb-1">Nombre de la tarea</label>
+                    <input type="text" id="titulo" placeholder="Ej: Preparar la presentación" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                 <div class="col-span-1">
+                    <label for="duracion" class="block text-sm font-medium text-slate-600 mb-1">Duración (min)</label>
+                    <input type="number" id="duracion" placeholder="30" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                 <div class="col-span-1">
+                    <label for="prioridad" class="block text-sm font-medium text-slate-600 mb-1">Prioridad</label>
+                    <select id="prioridad" class="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <option>Baja</option>
+                        <option selected>Media</option>
+                        <option>Alta</option>
+                    </select>
+                </div>
+                <div class="col-span-1 md:col-span-3">
+                     <button id="btn-agregar" class="w-full bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200">
+                        ➕ Agregar Tarea
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Tareas -->
+        <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3 text-slate-800">Mis Tareas</h3>
+            <ul id="lista-tareas" class="h-64 overflow-y-auto space-y-2 pr-2">
+                <!-- Las tareas se insertarán aquí dinámicamente -->
+            </ul>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button id="btn-completar" class="w-full bg-green-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-600 transition-colors duration-200">✔️ Completar</button>
+            <button id="btn-iniciar" class="w-full bg-blue-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-600 transition-colors duration-200">⏱️ Iniciar Timer</button>
+            <button id="btn-recomendar" class="w-full bg-amber-500 text-white font-semibold py-2 px-4 rounded-md hover:bg-amber-600 transition-colors duration-200">💡 Recomendaciones</button>
+        </div>
+    </div>
+
+    <!-- Modal para notificaciones y recomendaciones -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md text-center">
+            <h3 id="modal-title" class="text-xl font-bold mb-4"></h3>
+            <p id="modal-message" class="text-slate-600 mb-6 whitespace-pre-wrap"></p>
+            <button id="modal-close" class="bg-indigo-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-indigo-700">Entendido</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const taskListEl = document.getElementById('lista-tareas');
+        const titleInput = document.getElementById('titulo');
+        const durationInput = document.getElementById('duracion');
+        const priorityInput = document.getElementById('prioridad');
+        const addButton = document.getElementById('btn-agregar');
+        const completeButton = document.getElementById('btn-completar');
+        const timerButton = document.getElementById('btn-iniciar');
+        const recommendButton = document.getElementById('btn-recomendar');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalClose = document.getElementById('modal-close');
+
+        // --- State ---
+        let tareas = [];
+        let selectedTaskIndex = -1;
+        const DATA_KEY = "tareasApp.tareas";
+
+        // --- Functions ---
+
+        /**
+         * Carga las tareas desde localStorage.
+         */
+        function cargarTareas() {
+            const tareasJSON = localStorage.getItem(DATA_KEY);
+            if (tareasJSON) {
+                tareas = JSON.parse(tareasJSON);
+            }
+        }
+
+        /**
+         * Guarda las tareas en localStorage.
+         */
+        function guardarTareas() {
+            localStorage.setItem(DATA_KEY, JSON.stringify(tareas));
+        }
+
+        /**
+         * Muestra un modal con un título y mensaje personalizados.
+         * @param {string} title - El título del modal.
+         * @param {string} message - El mensaje a mostrar.
+         */
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        /**
+         * Renderiza la lista de tareas en el DOM.
+         */
+        function renderTareas() {
+            taskListEl.innerHTML = ''; // Limpiar lista actual
+            if (tareas.length === 0) {
+                taskListEl.innerHTML = `<li class="text-center text-slate-500 p-4">No tienes tareas pendientes. ¡Añade una!</li>`;
+                return;
+            }
+
+            tareas.forEach((tarea, index) => {
+                const li = document.createElement('li');
+                li.dataset.index = index;
+                li.className = `task-item flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors duration-200 ${tarea.completada ? 'bg-slate-200 text-slate-500 line-through' : 'bg-white hover:bg-slate-50'} ${index === selectedTaskIndex ? 'selected' : 'border-slate-200'}`;
+                
+                const estado = tarea.completada ? '✅' : '⏳';
+                
+                li.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="mr-3 text-xl">${estado}</span>
+                        <div>
+                            <span class="font-semibold">${tarea.titulo}</span>
+                            <span class="text-sm text-slate-500 block">${tarea.duracion} min | Prioridad: ${tarea.prioridad}</span>
+                        </div>
+                    </div>
+                    <div class="priority-indicator h-3 w-3 rounded-full ${getPriorityColor(tarea.prioridad)}"></div>
+                `;
+
+                li.addEventListener('click', () => {
+                    selectedTaskIndex = index;
+                    renderTareas(); // Re-render para mostrar la selección
+                });
+
+                taskListEl.appendChild(li);
+            });
+        }
+
+        /**
+         * Devuelve una clase de color de Tailwind según la prioridad.
+         * @param {string} prioridad - La prioridad de la tarea.
+         * @returns {string} - La clase de color.
+         */
+        function getPriorityColor(prioridad) {
+            switch (prioridad.toLowerCase()) {
+                case 'alta': return 'bg-red-500';
+                case 'media': return 'bg-yellow-500';
+                case 'baja': return 'bg-green-500';
+                default: return 'bg-slate-400';
+            }
+        }
+
+        /**
+         * Agrega una nueva tarea a la lista.
+         */
+        function agregarTarea() {
+            const titulo = titleInput.value.trim();
+            const duracion = parseInt(durationInput.value);
+            const prioridad = priorityInput.value;
+
+            if (!titulo || isNaN(duracion) || duracion <= 0) {
+                showModal("Error", "Por favor, introduce un nombre y una duración válida (número positivo).");
+                return;
+            }
+
+            const nuevaTarea = {
+                titulo,
+                duracion,
+                prioridad,
+                completada: false,
+                temporizador_usado: false
+            };
+
+            tareas.push(nuevaTarea);
+            titleInput.value = '';
+            durationInput.value = '';
+            priorityInput.value = 'Media';
+            
+            guardarTareas();
+            renderTareas();
+        }
+
+        /**
+         * Marca la tarea seleccionada como completada.
+         */
+        function completarTarea() {
+            if (selectedTaskIndex === -1) {
+                showModal("Atención", "Por favor, selecciona una tarea para marcar como completada.");
+                return;
+            }
+            tareas[selectedTaskIndex].completada = true;
+            guardarTareas();
+            renderTareas();
+        }
+
+        /**
+         * Inicia un temporizador para la tarea seleccionada.
+         */
+        function iniciarTemporizador() {
+            if (selectedTaskIndex === -1) {
+                showModal("Atención", "Por favor, selecciona una tarea para iniciar el temporizador.");
+                return;
+            }
+
+            const tarea = tareas[selectedTaskIndex];
+            if (tarea.completada) {
+                showModal("Tarea Completada", "Esta tarea ya ha sido completada.");
+                return;
+            }
+
+            showModal("Temporizador Iniciado", `El temporizador para "${tarea.titulo}" ha comenzado. Te notificaremos en ${tarea.duracion} minutos.`);
+
+            setTimeout(() => {
+                // Asegurarse de que la tarea todavía existe y no ha sido eliminada
+                if (tareas[selectedTaskIndex]) {
+                    showModal("¡Tiempo Terminado!", `La tarea "${tarea.titulo}" ha finalizado.`);
+                    tareas[selectedTaskIndex].completada = true;
+                    tareas[selectedTaskIndex].temporizador_usado = true;
+                    guardarTareas();
+                    renderTareas();
+                }
+            }, tarea.duracion * 60 * 1000);
+        }
+
+        /**
+         * Genera y muestra recomendaciones de gestión del tiempo.
+         */
+        function mostrarRecomendaciones() {
+            let consejos = [];
+            const pendientes = tareas.filter(t => !t.completada).length;
+            const totalTiempo = tareas.reduce((sum, t) => sum + t.duracion, 0);
+            const prioridadBajaTiempo = tareas.reduce((sum, t) => {
+                return t.prioridad.toLowerCase() === 'baja' ? sum + t.duracion : sum;
+            }, 0);
+            const usoTemporizador = tareas.some(t => t.temporizador_usado);
+
+            if (pendientes > 5) {
+                consejos.push("Tienes muchas tareas pendientes. Considera usar la técnica Eisenhower (urgente/importante) para priorizar.");
+            }
+            
+            if (totalTiempo > 0 && (prioridadBajaTiempo / totalTiempo > 0.4)) {
+                consejos.push("Estás dedicando mucho tiempo a tareas de baja prioridad. Revisa si puedes delegarlas, reducirlas o eliminarlas.");
+            }
+
+            if (!usoTemporizador && tareas.length > 0) {
+                consejos.push("No has usado el temporizador. Prueba la técnica Pomodoro (trabajar en bloques de tiempo con descansos) para mejorar tu concentración.");
+            }
+
+            if (tareas.length > 0 && pendientes === 0) {
+                consejos.push("¡Felicidades! Has completado todas tus tareas. Es un buen momento para planificar tu siguiente día.");
+            }
+
+            if (consejos.length === 0) {
+                consejos.push("¡Buen trabajo! Tu gestión del tiempo parece eficiente. Sigue así.");
+            }
+
+            const mensaje = consejos.join("\n\n");
+            showModal("Recomendaciones para Gestionar tu Tiempo", mensaje);
+        }
+
+        // --- Event Listeners ---
+        addButton.addEventListener('click', agregarTarea);
+        completeButton.addEventListener('click', completarTarea);
+        timerButton.addEventListener('click', iniciarTemporizador);
+        recommendButton.addEventListener('click', mostrarRecomendaciones);
+        modalClose.addEventListener('click', () => modal.classList.add('hidden'));
+
+        // Permitir agregar tarea con la tecla Enter
+        titleInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') agregarTarea();
+        });
+        durationInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') agregarTarea();
+        });
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarTareas();
+            renderTareas();
+        });
+    </script>
+</body>
+</html>
